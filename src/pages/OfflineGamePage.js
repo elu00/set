@@ -41,8 +41,26 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     alignItems: "center",
   },
-  panel: {
-    padding: theme.spacing(2),
+  sidebar: {
+    maxHeight: "100%",
+    display: "flex",
+    flexDirection: "column",
+    padding: 8,
+  },
+  timer: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alarm: {
+    color: theme.custom.alarm,
+    marginRight: 10,
+    marginBottom: 3,
+  },
+  score: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   doneOverlay: {
     position: "absolute",
@@ -69,12 +87,18 @@ function shuffleDeck() {
   return deck;
 }
 
-function formatElapsed(milliseconds) {
-  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const clock = `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
-  return hours ? `${hours}:${clock.padStart(5, "0")}` : clock;
+function formatTime(milliseconds, hideSubsecond = true) {
+  const elapsed = Math.max(0, milliseconds);
+  const hours = Math.floor(elapsed / (3600 * 1000));
+  const rest = elapsed % (3600 * 1000);
+  const minutes = Math.floor(rest / 60000);
+  const seconds = Math.floor((rest % 60000) / 1000);
+  const hundredths = Math.floor((rest % 1000) / 10);
+  const clock = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  const subsecond = hideSubsecond
+    ? ""
+    : `.${String(hundredths).padStart(2, "0")}`;
+  return `${hours ? `${hours}:` : ""}${clock}${subsecond}`;
 }
 
 function StartScreen({ initialMode, onStart }) {
@@ -316,75 +340,7 @@ function ActiveGame({ initialMode, onExit }) {
         />
       </Snackbar>
       <Grid container spacing={2}>
-        <Grid item xs={12} md={3} order={{ xs: 2, md: 1 }}>
-          <Paper className={classes.panel}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <AlarmIcon color="error" />
-              <Typography variant="h4">
-                {formatElapsed(elapsed)}
-              </Typography>
-            </Stack>
-            <Typography variant="h6" sx={{ mt: 2 }}>
-              Score: {history.length}
-            </Typography>
-            <Typography color="text.secondary">
-              Mode: {modes[game.mode].name}
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="overline" color="text.secondary">
-              Pace
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Estimated full-deck time
-            </Typography>
-            <Typography variant="h5">
-              {estimatedFinish === null
-                ? "—"
-                : formatElapsed(estimatedFinish)}
-            </Typography>
-          </Paper>
-        </Grid>
-
-        <Grid
-          item
-          xs={12}
-          md={6}
-          order={{ xs: 1, md: 2 }}
-          position="relative"
-          className={classes.mainColumn}
-        >
-          {done && (
-            <div className={classes.doneOverlay}>
-              <Paper elevation={3} className={classes.doneModal}>
-                <Typography variant="h5">Game complete</Typography>
-                <Typography sx={{ mt: 1 }}>
-                  You found {history.length}{" "}
-                  {history.length === 1 ? "set" : "sets"} in{" "}
-                  {formatElapsed(elapsed)}.
-                </Typography>
-                <Button
-                  variant="contained"
-                  sx={{ mt: 2 }}
-                  onClick={startNewGame}
-                >
-                  Play again
-                </Button>
-              </Paper>
-            </div>
-          )}
-          <Game
-            deck={current}
-            boardSize={boardSize}
-            selected={selected}
-            onClick={handleClick}
-            onClear={() => setSelected([])}
-            gameMode={game.mode}
-            lastSet={lastSet}
-            answer={answer}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={3} order={{ xs: 3, md: 3 }}>
+        <Grid item xs={12} md={3} order={{ xs: 3, md: 1 }}>
           <Stack spacing={2}>
             <Button
               variant="outlined"
@@ -415,6 +371,79 @@ function ActiveGame({ initialMode, onExit }) {
               Change mode
             </Button>
           </Stack>
+        </Grid>
+
+        <Grid
+          item
+          xs={12}
+          md={6}
+          order={{ xs: 1, md: 2 }}
+          position="relative"
+          className={classes.mainColumn}
+        >
+          {done && (
+            <div className={classes.doneOverlay}>
+              <Paper elevation={3} className={classes.doneModal}>
+                <Typography variant="h5">Game complete</Typography>
+                <Typography sx={{ mt: 1 }}>
+                  You found {history.length}{" "}
+                  {history.length === 1 ? "set" : "sets"} in{" "}
+                  {formatTime(elapsed, false)}.
+                </Typography>
+                <Button
+                  variant="contained"
+                  sx={{ mt: 2 }}
+                  onClick={startNewGame}
+                >
+                  Play again
+                </Button>
+              </Paper>
+            </div>
+          )}
+          <Game
+            deck={current}
+            boardSize={boardSize}
+            selected={selected}
+            onClick={handleClick}
+            onClear={() => setSelected([])}
+            gameMode={game.mode}
+            lastSet={lastSet}
+            answer={answer}
+          />
+        </Grid>
+
+        <Grid item xs={12} md={3} order={{ xs: 2, md: 3 }}>
+          <Paper className={classes.sidebar}>
+            <div className={classes.timer} style={{ marginTop: 6 }}>
+              <AlarmIcon className={classes.alarm} fontSize="large" />
+              <Typography variant="h4" align="center">
+                {formatTime(elapsed, !done)}
+              </Typography>
+            </div>
+            <Divider style={{ margin: "8px 0" }} />
+            <Typography variant="subtitle1">
+              <strong>Scoreboard</strong>
+            </Typography>
+            <div className={classes.score}>
+              <Typography variant="body2">Player</Typography>
+              <Typography variant="body2">
+                <strong>{history.length}</strong>
+              </Typography>
+            </div>
+            <Typography variant="body2" color="text.secondary">
+              {modes[game.mode].name}
+            </Typography>
+            <Divider style={{ margin: "8px 0" }} />
+            <Typography variant="subtitle1">
+              <strong>Pace</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Estimated full-deck time
+            </Typography>
+            <Typography variant="h5">
+              {estimatedFinish === null ? "—" : formatTime(estimatedFinish)}
+            </Typography>
+          </Paper>
         </Grid>
       </Grid>
     </Container>
