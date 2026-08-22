@@ -1,11 +1,16 @@
 import AlarmIcon from "@mui/icons-material/Alarm";
 import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardActionArea from "@mui/material/CardActionArea";
-import CardContent from "@mui/material/CardContent";
 import Container from "@mui/material/Container";
+import Divider from "@mui/material/Divider";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -72,58 +77,71 @@ function formatElapsed(milliseconds) {
   return hours ? `${hours}:${clock.padStart(5, "0")}` : clock;
 }
 
-function StartScreen({ onStart }) {
-  const [mode, setMode] = useState("normal");
+function StartScreen({ initialMode, onStart }) {
+  const [mode, setMode] = useState(initialMode);
+  const [choosingMode, setChoosingMode] = useState(false);
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 3, sm: 7 } }}>
+    <Container maxWidth="sm" sx={{ py: { xs: 3, sm: 7 } }}>
       <Typography variant="h3" align="center" gutterBottom>
         Play Set offline
       </Typography>
       <Typography color="text.secondary" align="center" sx={{ mb: 4 }}>
-        Choose a mode. Everything runs in this browser—no account or connection
-        is required.
+        Everything runs in this browser—no account or connection is required.
       </Typography>
-      <Grid container spacing={2}>
-        {Object.entries(modes).map(([key, value]) => (
-          <Grid item xs={12} sm={6} key={key}>
-            <Card
-              variant="outlined"
-              sx={{
-                height: "100%",
-                borderColor: key === mode ? "primary.main" : undefined,
-                borderWidth: key === mode ? 2 : 1,
-              }}
-            >
-              <CardActionArea
-                onClick={() => setMode(key)}
-                sx={{ height: "100%" }}
-              >
-                <CardContent>
-                  <Typography variant="h6">{value.name}</Typography>
-                  <Typography color="text.secondary">
-                    {value.description}
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
       <Button
         variant="contained"
         size="large"
         fullWidth
-        sx={{ mt: 3 }}
         onClick={() => onStart(mode)}
       >
         Start game
+      </Button>
+      <Button
+        color="inherit"
+        size="small"
+        fullWidth
+        sx={{ mt: 1 }}
+        onClick={() => setChoosingMode(true)}
+      >
+        {mode === "normal"
+          ? "Choose another mode"
+          : `Mode: ${modes[mode].name}`}
       </Button>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
         Select cards by clicking them or using the keyboard. Escape clears your
         selection. The board and card orientation keys are determined by your
         keyboard layout.
       </Typography>
+      <Dialog open={choosingMode} onClose={() => setChoosingMode(false)}>
+        <DialogTitle>Choose game mode</DialogTitle>
+        <DialogContent>
+          <RadioGroup
+            value={mode}
+            onChange={(event) => setMode(event.target.value)}
+          >
+            {Object.entries(modes).map(([key, value]) => (
+              <FormControlLabel
+                key={key}
+                value={key}
+                control={<Radio />}
+                label={
+                  <span>
+                    <strong>{value.name}</strong>
+                    <br />
+                    <Typography component="span" color="text.secondary">
+                      {value.description}
+                    </Typography>
+                  </span>
+                }
+              />
+            ))}
+          </RadioGroup>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setChoosingMode(false)}>Done</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
@@ -166,6 +184,12 @@ function ActiveGame({ initialMode, onExit }) {
   const done = !availableSet;
   const completedAt =
     done && history.length ? history[history.length - 1].time : now;
+  const elapsed = completedAt - game.startedAt;
+  const totalCards = game.mode === "setjr" ? 27 : game.deck.length;
+  const cardsRemoved = totalCards - current.length;
+  const estimatedFinish = cardsRemoved
+    ? (elapsed / cardsRemoved) * totalCards
+    : null;
   const maxHints = game.mode === "ultraset" ? 4 : 3;
   const answer = availableSet ? availableSet.slice(0, numHints) : null;
 
@@ -297,7 +321,7 @@ function ActiveGame({ initialMode, onExit }) {
             <Stack direction="row" spacing={1} alignItems="center">
               <AlarmIcon color="error" />
               <Typography variant="h4">
-                {formatElapsed(completedAt - game.startedAt)}
+                {formatElapsed(elapsed)}
               </Typography>
             </Stack>
             <Typography variant="h6" sx={{ mt: 2 }}>
@@ -305,6 +329,18 @@ function ActiveGame({ initialMode, onExit }) {
             </Typography>
             <Typography color="text.secondary">
               Mode: {modes[game.mode].name}
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="overline" color="text.secondary">
+              Pace
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Estimated full-deck time
+            </Typography>
+            <Typography variant="h5">
+              {estimatedFinish === null
+                ? "—"
+                : formatElapsed(estimatedFinish)}
             </Typography>
           </Paper>
         </Grid>
@@ -324,7 +360,7 @@ function ActiveGame({ initialMode, onExit }) {
                 <Typography sx={{ mt: 1 }}>
                   You found {history.length}{" "}
                   {history.length === 1 ? "set" : "sets"} in{" "}
-                  {formatElapsed(completedAt - game.startedAt)}.
+                  {formatElapsed(elapsed)}.
                 </Typography>
                 <Button
                   variant="contained"
@@ -386,11 +422,18 @@ function ActiveGame({ initialMode, onExit }) {
 }
 
 function OfflineGamePage() {
-  const [mode, setMode] = useState(null);
-  return mode ? (
-    <ActiveGame initialMode={mode} onExit={() => setMode(null)} />
+  const [playing, setPlaying] = useState(false);
+  const [mode, setMode] = useState("normal");
+
+  function startGame(selectedMode) {
+    setMode(selectedMode);
+    setPlaying(true);
+  }
+
+  return playing ? (
+    <ActiveGame initialMode={mode} onExit={() => setPlaying(false)} />
   ) : (
-    <StartScreen onStart={setMode} />
+    <StartScreen initialMode={mode} onStart={startGame} />
   );
 }
 

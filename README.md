@@ -4,10 +4,12 @@ This repository contains a single-player implementation of the card game Set.
 The game runs entirely in the browser: it has no accounts, multiplayer rooms,
 database, cloud functions, analytics, or other runtime network dependency.
 
-The original visual design, card renderer, themes, sounds, keyboard layouts,
-and game modes are retained. A player can choose a mode, start or restart a
-game, select cards with the mouse or keyboard, request hints, rotate the cards,
-flip the board, and change local display settings.
+The original visual design, card renderer, themes, sounds, and keyboard layouts
+are retained. A player can immediately start or restart a standard game, select
+cards with the mouse or keyboard, request hints, rotate the cards, flip the
+board, and change local display settings. Alternative game modes remain
+available behind the secondary mode chooser. The timer also projects a
+full-deck completion time from the player's current pace.
 
 ## Static deployment
 
