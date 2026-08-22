@@ -1,11 +1,4 @@
 {
-  "database": {
-    "rules": "database.rules.json"
-  },
-  "functions": {
-    "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"],
-    "source": "functions"
-  },
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
@@ -15,32 +8,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "storage": {
-    "rules": "storage.rules"
-  },
-  "emulators": {
-    "auth": {
-      "port": 9099
-    },
-    "database": {
-      "port": 9000
-    },
-    "functions": {
-      "port": 5001
-    },
-    "hosting": {
-      "port": 9001
-    },
-    "pubsub": {
-      "port": 8085
-    },
-    "storage": {
-      "port": 9199
-    },
-    "ui": {
-      "enabled": true,
-      "port": 4000
-    }
   }
 }

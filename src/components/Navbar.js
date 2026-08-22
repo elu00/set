@@ -4,7 +4,6 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import AppBar from "@mui/material/AppBar";
-import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
 import Menu from "@mui/material/Menu";
@@ -16,16 +15,9 @@ import { useContext, useState } from "react";
 import useSound from "use-sound";
 
 import layoutSfx from "../assets/layoutChangeSound.mp3";
-import { version } from "../config";
-import { SettingsContext, UserContext } from "../context";
-import firebase from "../firebase";
-import AccountOptionsDialog from "./AccountOptionsDialog";
+import { SettingsContext } from "../context";
 import ColorChoiceDialog from "./ColorChoiceDialog";
-import InternalLink from "./InternalLink";
 import KeyboardLayoutDialog from "./KeyboardLayoutDialog";
-import PromptDialog from "./PromptDialog";
-import User from "./User";
-import UserColorDialog from "./UserColorDialog";
 
 function Navbar({
   themeType,
@@ -33,145 +25,76 @@ function Navbar({
   customColors,
   handleCustomColors,
 }) {
-  const user = useContext(UserContext);
   const settings = useContext(SettingsContext);
   const [playLayout] = useSound(layoutSfx);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [changeName, setChangeName] = useState(false);
-  const [changeUserColor, setChangeUserColor] = useState(false);
   const [changeCardColors, setChangeCardColors] = useState(false);
   const [changeKeyboardLayout, setChangeKeyboardLayout] = useState(false);
-  const [showOptions, setShowOptions] = useState(false);
-
-  function handleMenu(event) {
-    setAnchorEl(event.currentTarget);
-  }
-
-  function handleCloseMenu() {
-    setAnchorEl(null);
-  }
-
-  function handleChangeName(name) {
-    setChangeName(false);
-    name = (name || "").trim();
-    if (name) {
-      firebase.database().ref(`users/${user.id}/name`).set(name);
-    }
-  }
 
   function handleChangeCardColors(colorMap) {
     setChangeCardColors(false);
     if (colorMap) {
-      customColors[themeType] = colorMap;
-      handleCustomColors(customColors);
+      handleCustomColors({ ...customColors, [themeType]: colorMap });
     }
-  }
-
-  function handleChangeVolume() {
-    settings.setVolume((volume) => (volume === "on" ? "off" : "on"));
   }
 
   return (
     <AppBar position="relative" color="transparent" elevation={0}>
       <Toolbar variant="dense">
-        <Typography variant="h6" style={{ flexGrow: 1, whiteSpace: "nowrap" }}>
-          <InternalLink underline="none" color="inherit" to="/">
+        <Typography variant="h6" sx={{ flexGrow: 1, whiteSpace: "nowrap" }}>
+          <Link underline="none" color="inherit" href="./">
             Set with Friends
-          </InternalLink>
+          </Link>
         </Typography>
-        <Typography
-          variant="subtitle1"
-          style={{ marginLeft: "2em", marginRight: 8, minWidth: 0 }}
+        <IconButton
+          color="inherit"
+          aria-label={settings.volume === "on" ? "Mute" : "Unmute"}
+          onClick={() =>
+            settings.setVolume((value) => (value === "on" ? "off" : "on"))
+          }
+          size="large"
         >
-          <InternalLink underline="none" to={`/profile/${user.id}`}>
-            <User
-              id={user.id}
-              style={{
-                display: "block",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            />
-          </InternalLink>
-        </Typography>
-        <IconButton color="inherit" onClick={handleChangeVolume} size="large">
-          {settings.volume === "on" ? (
-            <Tooltip title="Mute">
-              <VolumeUpIcon />
-            </Tooltip>
-          ) : (
-            <Tooltip title="Unmute">
-              <VolumeOffIcon />
-            </Tooltip>
-          )}
+          <Tooltip title={settings.volume === "on" ? "Mute" : "Unmute"}>
+            {settings.volume === "on" ? <VolumeUpIcon /> : <VolumeOffIcon />}
+          </Tooltip>
         </IconButton>
-        <IconButton color="inherit" onClick={handleChangeTheme} size="large">
-          {themeType === "light" ? (
-            <Tooltip title="Dark theme">
+        <IconButton
+          color="inherit"
+          aria-label={themeType === "light" ? "Dark theme" : "Light theme"}
+          onClick={handleChangeTheme}
+          size="large"
+        >
+          <Tooltip
+            title={themeType === "light" ? "Dark theme" : "Light theme"}
+          >
+            {themeType === "light" ? (
               <Brightness4Icon />
-            </Tooltip>
-          ) : (
-            <Tooltip title="Light theme">
+            ) : (
               <Brightness7Icon />
-            </Tooltip>
-          )}
+            )}
+          </Tooltip>
         </IconButton>
-        <IconButton color="inherit" onClick={handleMenu} size="large">
+        <IconButton
+          color="inherit"
+          aria-label="Settings"
+          onClick={(event) => setAnchorEl(event.currentTarget)}
+          size="large"
+        >
           <Tooltip title="Settings">
             <SettingsIcon />
           </Tooltip>
         </IconButton>
         <Menu
           anchorEl={anchorEl}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "center",
-          }}
-          keepMounted
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "center",
-          }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          transformOrigin={{ vertical: "top", horizontal: "center" }}
           open={anchorEl !== null}
-          onClose={handleCloseMenu}
+          onClose={() => setAnchorEl(null)}
         >
-          <Typography variant="subtitle1" align="center">
-            {version ? `Version ${version}` : "Development Version"}
-          </Typography>
-          {version && (
-            <Typography variant="subtitle2" align="center">
-              <Link
-                target="_blank"
-                rel="noopener"
-                href={`https://github.com/ekzhang/setwithfriends/releases/tag/v${version}`}
-                underline="hover"
-              >
-                Release Notes
-              </Link>
-            </Typography>
-          )}
-          <Divider style={{ margin: "8px 0" }} />
-          <MenuItem
-            onClick={() => {
-              setChangeName(true);
-              handleCloseMenu();
-            }}
-          >
-            Change name
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setChangeUserColor(true);
-              handleCloseMenu();
-            }}
-          >
-            Change user color
-          </MenuItem>
           <MenuItem
             onClick={() => {
               setChangeCardColors(true);
-              handleCloseMenu();
+              setAnchorEl(null);
             }}
           >
             Change card colors
@@ -179,7 +102,7 @@ function Navbar({
           <MenuItem
             onClick={() => {
               setChangeKeyboardLayout(true);
-              handleCloseMenu();
+              setAnchorEl(null);
             }}
           >
             Change keyboard layout
@@ -189,33 +112,12 @@ function Navbar({
               if (settings.volume === "on") playLayout();
               settings.toggleLayoutOrientation();
               settings.toggleCardOrientation();
-              handleCloseMenu();
+              setAnchorEl(null);
             }}
           >
             Flip board layout
           </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setShowOptions(true);
-              handleCloseMenu();
-            }}
-          >
-            Account options
-          </MenuItem>
         </Menu>
-        <PromptDialog
-          open={changeName}
-          onClose={handleChangeName}
-          title="Change Name"
-          message="Enter your preferred display name below. This will be updated for all current, past, and future games."
-          label="Name"
-          maxLength={25}
-        />
-        <UserColorDialog
-          open={changeUserColor}
-          onClose={() => setChangeUserColor(false)}
-          title="Change User Color"
-        />
         <ColorChoiceDialog
           open={changeCardColors}
           onClose={handleChangeCardColors}
@@ -225,10 +127,6 @@ function Navbar({
           open={changeKeyboardLayout}
           onClose={() => setChangeKeyboardLayout(false)}
           title="Change Keyboard Layout"
-        />
-        <AccountOptionsDialog
-          open={showOptions}
-          onClose={() => setShowOptions(false)}
         />
       </Toolbar>
     </AppBar>

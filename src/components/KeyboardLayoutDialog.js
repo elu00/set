@@ -12,7 +12,7 @@ import makeStyles from "@mui/styles/makeStyles";
 import { useContext } from "react";
 
 import { SettingsContext } from "../context";
-import { standardLayouts } from "../util";
+import { standardLayouts } from "../gameLogic";
 
 const useStyles = makeStyles({
   formControl: {

@@ -3,6 +3,10 @@ import { defineConfig, transformWithEsbuild } from "vite";
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Relative asset URLs make the built `dist` directory portable: it can be
+  // served from any static subpath or opened by a local static file server.
+  base: "./",
+
   build: {
     chunkSizeWarningLimit: 2048,
   },

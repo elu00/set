@@ -11,7 +11,7 @@ import ResponsiveSetCard from "../components/ResponsiveSetCard";
 import { SettingsContext } from "../context";
 import useDimensions from "../hooks/useDimensions";
 import useKeydown from "../hooks/useKeydown";
-import { generateCards, standardLayouts } from "../util";
+import { generateCards, standardLayouts } from "../gameLogic";
 
 const gamePadding = 8;
 const cardArray = generateCards();

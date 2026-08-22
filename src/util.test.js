@@ -4,11 +4,10 @@ import {
   checkSet,
   checkSetUltra,
   conjugateCard,
-  filter,
   findSet,
   generateCards,
   initializeDeck,
-} from "./util";
+} from "./gameLogic";
 
 it("computes conjugate cards", () => {
   expect(conjugateCard("0001", "0002")).toBe("0000");
@@ -85,11 +84,4 @@ it("initializes junior deck", () => {
   expect(initializeDeck(generateCards(), "normal")).has.length(81);
   expect(initializeDeck(generateCards(), "setchain")).has.length(81);
   expect(initializeDeck(generateCards(), "ultraset")).has.length(81);
-});
-
-describe("bad-words filter", () => {
-  it("does not trigger on 'wang'", () => {
-    expect(filter.isProfane("Rona Wang")).toBe(false);
-    expect(filter.isProfane("wang")).toBe(false);
-  });
 });

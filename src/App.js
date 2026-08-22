@@ -1,36 +1,37 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import { StyledEngineProvider, ThemeProvider } from "@mui/material/styles";
-import { useEffect, useState } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { useEffect, useMemo } from "react";
 
-import ConnectionsTracker from "./components/ConnectionsTracker";
 import Navbar from "./components/Navbar";
-import WelcomeDialog from "./components/WelcomeDialog";
-import { SettingsContext, UserContext } from "./context";
-import firebase from "./firebase";
+import { SettingsContext } from "./context";
 import useStorage from "./hooks/useStorage";
-import AboutPage from "./pages/AboutPage";
-import BannedPage from "./pages/BannedPage";
-import ConductPage from "./pages/ConductPage";
-import DonatePage from "./pages/DonatePage";
-import GamePage from "./pages/GamePage";
-import HelpPage from "./pages/HelpPage";
-import LegalPage from "./pages/LegalPage";
-import LoadingPage from "./pages/LoadingPage";
-import LobbyPage from "./pages/LobbyPage";
-import NotFoundPage from "./pages/NotFoundPage";
-import ProfilePage from "./pages/ProfilePage";
-import RoomPage from "./pages/RoomPage";
+import OfflineGamePage from "./pages/OfflineGamePage";
 import "./styles.css";
 import { darkTheme, lightTheme } from "./themes";
-import { generateColor, generateName } from "./util";
+
+function parseCustomColors(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function withCustomColors(theme, colors) {
+  return colors
+    ? {
+        ...theme,
+        custom: {
+          ...theme.custom,
+          setCard: { ...theme.custom.setCard, ...colors },
+        },
+      }
+    : theme;
+}
 
 function App() {
-  const [authUser, setAuthUser] = useState(null);
-  const [user, setUser] = useState(null);
   const [themeType, setThemeType] = useStorage("theme", "light");
-  const [customLightTheme, setCustomLightTheme] = useState(lightTheme);
-  const [customDarkTheme, setCustomDarkTheme] = useState(darkTheme);
   const [customColors, setCustomColors] = useStorage("customColors", "{}");
   const [keyboardLayout, setKeyboardLayout] = useStorage(
     "keyboardLayout",
@@ -44,140 +45,65 @@ function App() {
     "orientation",
     "vertical",
   );
-
-  const toggleLayoutOrientation = () => {
-    setLayoutOrientation((x) => (x === "portrait" ? "landscape" : "portrait"));
-  };
-  const toggleCardOrientation = () => {
-    setCardOrientation((x) => (x === "vertical" ? "horizontal" : "vertical"));
-  };
-
   const [volume, setVolume] = useStorage("volume", "on");
 
-  useEffect(() => {
-    return firebase.auth().onAuthStateChanged((user) => {
-      if (user) {
-        // User is signed in.
-        setAuthUser({ ...user._delegate });
-      } else {
-        // User is signed out.
-        setAuthUser(null);
-        firebase
-          .auth()
-          .signInAnonymously()
-          .catch(() => {
-            alert("Unable to connect to the server. Please try again later.");
-          });
-      }
-    });
-  }, []);
+  const parsedColors = useMemo(
+    () => parseCustomColors(customColors),
+    [customColors],
+  );
+  const theme = useMemo(
+    () =>
+      themeType === "light"
+        ? withCustomColors(lightTheme, parsedColors.light)
+        : withCustomColors(darkTheme, parsedColors.dark),
+    [themeType, parsedColors],
+  );
 
   useEffect(() => {
-    if (!authUser) {
-      setUser(null);
-      return;
-    }
-    const userRef = firebase.database().ref(`/users/${authUser.uid}`);
-    function update(snapshot) {
-      if (snapshot.child("name").exists()) {
-        setUser({
-          ...snapshot.val(),
-          id: authUser.uid,
-          authUser,
-          setAuthUser,
-        });
-      } else {
-        userRef.update({
-          color: generateColor(),
-          name: generateName(),
-        });
-      }
-    }
-    userRef.on("value", update);
-    return () => {
-      userRef.off("value", update);
-    };
-  }, [authUser]);
+    document.documentElement.style.colorScheme = themeType;
+  }, [themeType]);
 
-  useEffect(() => {
-    const parsedCustoms = JSON.parse(customColors);
-    if (parsedCustoms.light) {
-      setCustomLightTheme({
-        ...lightTheme,
-        custom: {
-          ...lightTheme.custom,
-          setCard: { ...lightTheme.custom.setCard, ...parsedCustoms.light },
-        },
-      });
-    }
-    if (parsedCustoms.dark) {
-      setCustomDarkTheme({
-        ...darkTheme,
-        custom: {
-          ...darkTheme.custom,
-          setCard: { ...darkTheme.custom.setCard, ...parsedCustoms.dark },
-        },
-      });
-    }
-  }, [customColors]);
-
-  const handleChangeTheme = () => {
-    setThemeType(themeType === "light" ? "dark" : "light");
+  const toggleLayoutOrientation = () => {
+    setLayoutOrientation((value) =>
+      value === "portrait" ? "landscape" : "portrait",
+    );
   };
-
-  const handleCustomColors = (custom) => {
-    setCustomColors(JSON.stringify(custom));
+  const toggleCardOrientation = () => {
+    setCardOrientation((value) =>
+      value === "vertical" ? "horizontal" : "vertical",
+    );
   };
 
   return (
     <StyledEngineProvider injectFirst>
-      <ThemeProvider
-        theme={themeType === "light" ? customLightTheme : customDarkTheme}
-      >
-        <BrowserRouter>
-          <CssBaseline />
-          {!user ? (
-            <LoadingPage />
-          ) : user.banned && Date.now() < user.banned ? (
-            <BannedPage time={user.banned} />
-          ) : (
-            <UserContext.Provider value={user}>
-              <SettingsContext.Provider
-                value={{
-                  keyboardLayout,
-                  setKeyboardLayout,
-                  volume,
-                  setVolume,
-                  layoutOrientation,
-                  toggleLayoutOrientation,
-                  cardOrientation,
-                  toggleCardOrientation,
-                }}
-              >
-                <ConnectionsTracker />
-                <WelcomeDialog />
-                <Navbar
-                  themeType={themeType}
-                  handleChangeTheme={handleChangeTheme}
-                  customColors={JSON.parse(customColors)}
-                  handleCustomColors={handleCustomColors}
-                />
-                <Routes>
-                  <Route path="/help" element={<HelpPage />} />
-                  <Route path="/about" element={<AboutPage />} />
-                  <Route path="/conduct" element={<ConductPage />} />
-                  <Route path="/donate" element={<DonatePage />} />
-                  <Route path="/legal" element={<LegalPage />} />
-                  <Route path="/" element={<LobbyPage />} />
-                  <Route path="/room/:id" element={<RoomPage />} />
-                  <Route path="/game/:id" element={<GamePage />} />
-                  <Route path="/profile/:id" element={<ProfilePage />} />
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
-              </SettingsContext.Provider>
-            </UserContext.Provider>
-          )}
-        </BrowserRouter>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <SettingsContext.Provider
+          value={{
+            keyboardLayout,
+            setKeyboardLayout,
+            volume,
+            setVolume,
+            layoutOrientation,
+            toggleLayoutOrientation,
+            cardOrientation,
+            toggleCardOrientation,
+          }}
+        >
+          <Navbar
+            themeType={themeType}
+            handleChangeTheme={() =>
+              setThemeType((value) =>
+                value === "light" ? "dark" : "light",
+              )
+            }
+            customColors={parsedColors}
+            handleCustomColors={(colors) =>
+              setCustomColors(JSON.stringify(colors))
+            }
+          />
+          <OfflineGamePage />
+        </SettingsContext.Provider>
       </ThemeProvider>
     </StyledEngineProvider>
   );
