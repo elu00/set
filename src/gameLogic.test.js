@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+// Unit tests for the browser-only game engine.
+
 import {
   checkSet,
   checkSetUltra,

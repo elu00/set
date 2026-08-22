@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "es2018"
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2020"
   },
   "exclude": ["node_modules"]
 }

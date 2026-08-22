@@ -20,7 +20,7 @@ Pushes to `main` automatically build and deploy the site to GitHub Pages using
 the workflow in `.github/workflows/deploy.yml`. In the repository's GitHub
 settings, set **Pages → Build and deployment → Source** to **GitHub Actions**.
 The published site will be available at
-<https://elu00.github.io/setwithfriends/>.
+<https://elu00.github.io/set/>.
 
 On a development machine with the project's Node toolchain available, the
 usual scripts are:
