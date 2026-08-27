@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 // Unit tests for the browser-only game engine.
 
 import {
+  attributeSameness,
   checkSet,
   checkSetUltra,
   conjugateCard,
@@ -24,6 +25,27 @@ it("checks sets", () => {
   expect(checkSet("1221", "1002", "1100")).toBe(false);
   expect(checkSet("0112", "0112", "0112")).toBe(true);
   expect(checkSet("0112", "0122", "0112")).toBe(false);
+});
+
+it("computes attribute sameness", () => {
+  expect(attributeSameness("0001", "0002", "0000")).toStrictEqual([
+    true,
+    true,
+    true,
+    false,
+  ]);
+  expect(attributeSameness("1201", "1002", "1100")).toStrictEqual([
+    true,
+    false,
+    true,
+    false,
+  ]);
+  expect(attributeSameness("0112", "0112", "0112")).toStrictEqual([
+    true,
+    true,
+    true,
+    true,
+  ]);
 });
 
 const verifyUltra = (cards) => {

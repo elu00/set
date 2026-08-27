@@ -85,6 +85,14 @@ export function checkSet(a, b, c) {
   return true;
 }
 
+export function attributeSameness(a, b, c) {
+  const result = [];
+  for (let i = 0; i < 4; i += 1) {
+    result.push(a[i] === b[i] && b[i] === c[i]);
+  }
+  return result;
+}
+
 export function conjugateCard(a, b) {
   const zeroCode = "0".charCodeAt(0);
   let card = "";
@@ -198,18 +206,13 @@ function processChain(state, event) {
   }
   if (!valid) return;
 
-  recordValidEvent(
-    state,
-    event,
-    isFirstSet ? [c1, c2, c3] : [c2, c3],
-  );
+  recordValidEvent(state, event, isFirstSet ? [c1, c2, c3] : [c2, c3]);
   const minSize = Math.max(state.boardSize - (isFirstSet ? 3 : 2), 12);
-  state.boardSize = splitDeck(
-    state.current,
-    "setchain",
-    minSize,
-    [c1, c2, c3],
-  ).length;
+  state.boardSize = splitDeck(state.current, "setchain", minSize, [
+    c1,
+    c2,
+    c3,
+  ]).length;
 }
 
 function processUltra(state, event) {

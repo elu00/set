@@ -1,11 +1,11 @@
 import AlarmIcon from "@mui/icons-material/Alarm";
 import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
-import Divider from "@mui/material/Divider";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import Divider from "@mui/material/Divider";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
@@ -23,7 +23,7 @@ import foundSfx from "../assets/successfulSetSound.mp3";
 import Game from "../components/Game";
 import SnackContent from "../components/SnackContent";
 import { SettingsContext } from "../context";
-import useKeydown from "../hooks/useKeydown";
+import { formatTime } from "../formatTime";
 import {
   checkSet,
   checkSetUltra,
@@ -33,6 +33,10 @@ import {
   modes,
   removeCard,
 } from "../gameLogic";
+import useKeydown from "../hooks/useKeydown";
+import useNormalModeStats from "../hooks/useNormalModeStats";
+import StatsPage from "./StatsPage";
+import StudySession from "./StudySession";
 
 const PLAYER_ID = "player";
 
@@ -87,21 +91,7 @@ function shuffleDeck() {
   return deck;
 }
 
-function formatTime(milliseconds, hideSubsecond = true) {
-  const elapsed = Math.max(0, milliseconds);
-  const hours = Math.floor(elapsed / (3600 * 1000));
-  const rest = elapsed % (3600 * 1000);
-  const minutes = Math.floor(rest / 60000);
-  const seconds = Math.floor((rest % 60000) / 1000);
-  const hundredths = Math.floor((rest % 1000) / 10);
-  const clock = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  const subsecond = hideSubsecond
-    ? ""
-    : `.${String(hundredths).padStart(2, "0")}`;
-  return `${hours ? `${hours}:` : ""}${clock}${subsecond}`;
-}
-
-function StartScreen({ initialMode, onStart }) {
+function StartScreen({ initialMode, onStart, onViewStats }) {
   const [mode, setMode] = useState(initialMode);
   const [choosingMode, setChoosingMode] = useState(false);
 
@@ -131,6 +121,15 @@ function StartScreen({ initialMode, onStart }) {
         {mode === "normal"
           ? "Choose another mode"
           : `Mode: ${modes[mode].name}`}
+      </Button>
+      <Button
+        color="inherit"
+        size="small"
+        fullWidth
+        sx={{ mt: 1 }}
+        onClick={onViewStats}
+      >
+        View stats
       </Button>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
         Select cards by clicking them or using the keyboard. Escape clears your
@@ -170,13 +169,10 @@ function StartScreen({ initialMode, onStart }) {
   );
 }
 
-function ActiveGame({ initialMode, onExit }) {
+function ActiveGame({ initialMode, onExit, onFind }) {
   const classes = useStyles();
-  const {
-    volume,
-    toggleCardOrientation,
-    toggleLayoutOrientation,
-  } = useContext(SettingsContext);
+  const { volume, toggleCardOrientation, toggleLayoutOrientation } =
+    useContext(SettingsContext);
   const [game, setGame] = useState(() => ({
     deck: shuffleDeck(),
     events: [],
@@ -200,11 +196,7 @@ function ActiveGame({ initialMode, onExit }) {
     const { c1, c2, c3 } = history[history.length - 1];
     return [c1, c2, c3];
   }, [game.mode, history]);
-  const availableSet = findSet(
-    current.slice(0, boardSize),
-    game.mode,
-    lastSet,
-  );
+  const availableSet = findSet(current.slice(0, boardSize), game.mode, lastSet);
   const done = !availableSet;
   const completedAt =
     done && history.length ? history[history.length - 1].time : now;
@@ -254,6 +246,18 @@ function ActiveGame({ initialMode, onExit }) {
       time: Date.now(),
     };
     if (cards[3]) event.c4 = cards[3];
+    if (game.mode === "normal" && onFind) {
+      onFind({
+        sessionId: game.startedAt,
+        findIndex: history.length,
+        time: event.time,
+        durationMs:
+          event.time -
+          (history.length ? history[history.length - 1].time : game.startedAt),
+        board: current.slice(0, boardSize),
+        cards: [cards[0], cards[1], cards[2]],
+      });
+    }
     setGame((value) => ({ ...value, events: [...value.events, event] }));
     setNumHints(0);
   }
@@ -453,16 +457,50 @@ function ActiveGame({ initialMode, onExit }) {
 function OfflineGamePage() {
   const [playing, setPlaying] = useState(false);
   const [mode, setMode] = useState("normal");
+  const [studyPool, setStudyPool] = useState(null);
+  const [viewingStats, setViewingStats] = useState(false);
+  const stats = useNormalModeStats();
 
   function startGame(selectedMode) {
     setMode(selectedMode);
     setPlaying(true);
   }
 
+  if (viewingStats) {
+    return (
+      <StatsPage
+        stats={stats}
+        onBack={() => setViewingStats(false)}
+        onStartStudy={(pool) => {
+          setViewingStats(false);
+          setStudyPool(pool);
+        }}
+      />
+    );
+  }
+
+  if (studyPool) {
+    return (
+      <StudySession
+        pool={studyPool}
+        markStudyState={stats.markStudyState}
+        onExit={() => setStudyPool(null)}
+      />
+    );
+  }
+
   return playing ? (
-    <ActiveGame initialMode={mode} onExit={() => setPlaying(false)} />
+    <ActiveGame
+      initialMode={mode}
+      onExit={() => setPlaying(false)}
+      onFind={stats.recordFind}
+    />
   ) : (
-    <StartScreen initialMode={mode} onStart={startGame} />
+    <StartScreen
+      initialMode={mode}
+      onStart={startGame}
+      onViewStats={() => setViewingStats(true)}
+    />
   );
 }
 
