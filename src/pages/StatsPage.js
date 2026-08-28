@@ -10,14 +10,16 @@ import { useMemo, useState } from "react";
 
 import DurationHistogram from "../components/DurationHistogram";
 import HypercubeGrid from "../components/HypercubeGrid";
-import { formatSeconds } from "../formatTime";
+import { formatSeconds, formatTime } from "../formatTime";
 import {
   ATTRIBUTE_NAMES,
   MIN_SAMPLE_SIZE,
   computeAttributeEffectBySameCount,
   computeBoardSizeTiers,
   computeDifferenceTiers,
+  computeFinishTimeStats,
   durationHistogram,
+  finishTimeHistogram,
   hasEnoughData,
   percentileAtThreshold,
   selectStudyPool,
@@ -25,6 +27,7 @@ import {
 
 const MAX_SLIDER_SECONDS = 120;
 const DEFAULT_THRESHOLD_SECONDS = 10;
+const FINISH_BUCKET_SECONDS = 60;
 
 // Wraps a number that changes often (a percentage, a live count) in a
 // fixed-width, right-aligned box so the surrounding sentence doesn't
@@ -210,6 +213,86 @@ function BoardSizeSection({ finds }) {
   return <TierBars items={items} />;
 }
 
+function FinishTimesSection({ finds }) {
+  const summary = useMemo(() => computeFinishTimeStats(finds), [finds]);
+  const histogram = useMemo(
+    () =>
+      finishTimeHistogram(finds, { bucketSeconds: FINISH_BUCKET_SECONDS }),
+    [finds],
+  );
+
+  if (summary.count === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Complete a normal-mode game to start tracking finish times. Existing
+        find history is preserved, but games recorded before this feature do
+        not contain a finish time.
+      </Typography>
+    );
+  }
+
+  const summaryItems = [
+    ["Games", summary.count],
+    ["Median", formatTime(summary.medianMs)],
+    [
+      "Mean ± deviation",
+      `${formatTime(summary.meanMs)} ± ${formatTime(summary.stdDevMs)}`,
+    ],
+    [
+      "Fastest–slowest",
+      `${formatTime(summary.minMs)}–${formatTime(summary.maxMs)}`,
+    ],
+  ];
+  const chartEndSeconds = histogram[histogram.length - 1].bucketEndSec;
+
+  return (
+    <Stack spacing={1}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" },
+          gap: 1,
+        }}
+      >
+        {summaryItems.map(([label, value]) => (
+          <Box
+            key={label}
+            sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1,
+              p: 1,
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+            >
+              {label}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {value}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+      <DurationHistogram histogram={histogram} height={96} />
+      <Stack direction="row" justifyContent="space-between">
+        <Typography variant="caption" color="text.secondary">
+          0:00
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {formatTime(chartEndSeconds * 1000)}
+        </Typography>
+      </Stack>
+      <Typography variant="caption" color="text.secondary">
+        Completed games grouped into one-minute buckets.
+      </Typography>
+    </Stack>
+  );
+}
+
 function StatsPage({ stats, onBack, onStartStudy }) {
   const { finds, loading, clearAll } = stats;
   const [thresholdSeconds, setThresholdSeconds] = useState(
@@ -262,6 +345,19 @@ function StatsPage({ stats, onBack, onStartStudy }) {
         <Stack spacing={3}>
           <Box>
             <Typography variant="subtitle1" gutterBottom>
+              <strong>Overall finish times</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              The distribution and summary of how long complete normal-mode
+              games took.
+            </Typography>
+            <FinishTimesSection finds={finds} />
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle1" gutterBottom>
               <strong>Speed by how many attributes differ</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -309,9 +405,11 @@ function StatsPage({ stats, onBack, onStartStudy }) {
               <strong>Every attribute pattern</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              All 16 same/different combinations across the 4 attributes (S/D
-              per color, shape, shade, number), with an example set, average ±
-              standard deviation, and a duration histogram for each.
+              All 15 possible same/different combinations across the 4
+              attributes (S/D per color, shape, shade, number), with an example
+              set, average ± standard deviation, and a duration histogram for
+              each. The all-same combination is impossible for three distinct
+              cards and is omitted.
             </Typography>
             <HypercubeGrid finds={finds} />
           </Box>

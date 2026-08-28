@@ -96,8 +96,8 @@ export function computeBoardSizeTiers(finds) {
   });
 }
 
-// The 2^4 = 16 combinations of same/different across the 4 attributes,
-// arranged as a 4x4 grid: rows vary Color/Shape, columns vary Shade/Number.
+// The possible combinations of same/different across the 4 attributes,
+// positioned in a 4x4 grid: rows vary Color/Shape, columns vary Shade/Number.
 export function hypercubePatterns() {
   const pairs = [
     [true, true],
@@ -111,7 +111,9 @@ export function hypercubePatterns() {
       patterns.push({ row, col, sameAttrs: [...pairs[row], ...pairs[col]] });
     }
   }
-  return patterns;
+  // The all-same pattern would require selecting the same card three times.
+  // It can never occur in a real game, where cards on the board are distinct.
+  return patterns.filter((pattern) => pattern.sameAttrs.some((same) => !same));
 }
 
 export function selectFindsByPattern(finds, sameAttrs) {
@@ -171,6 +173,48 @@ export function durationHistogram(finds, options = {}) {
   }
 
   return buckets;
+}
+
+function median(values) {
+  if (values.length === 0) return null;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function finishDurations(finds) {
+  return finds
+    .map((find) => find.finishDurationMs)
+    .filter((duration) => Number.isFinite(duration) && duration >= 0);
+}
+
+export function computeFinishTimeStats(finds) {
+  const durations = finishDurations(finds);
+  return {
+    count: durations.length,
+    meanMs: mean(durations),
+    medianMs: median(durations),
+    stdDevMs: stdDev(durations),
+    minMs: durations.length ? Math.min(...durations) : null,
+    maxMs: durations.length ? Math.max(...durations) : null,
+  };
+}
+
+export function finishTimeHistogram(finds, options = {}) {
+  const { bucketSeconds = 60 } = options;
+  const durations = finishDurations(finds);
+  if (durations.length === 0) return [];
+  const maxDurationSeconds = Math.max(...durations) / 1000;
+  const maxSeconds = Math.max(
+    bucketSeconds,
+    Math.ceil(maxDurationSeconds / bucketSeconds) * bucketSeconds,
+  );
+  return durationHistogram(
+    durations.map((durationMs) => ({ durationMs })),
+    { maxSeconds, bucketSeconds },
+  );
 }
 
 export function percentileAtThreshold(finds, thresholdMs) {

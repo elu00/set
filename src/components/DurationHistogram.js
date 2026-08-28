@@ -15,6 +15,7 @@ function DurationHistogram({ histogram, thresholdSeconds, height = 48 }) {
       {histogram.map((bucket) => (
         <Box
           key={bucket.bucketStartSec}
+          title={`${bucket.bucketStartSec}–${bucket.bucketEndSec}s: ${bucket.count}`}
           sx={{
             flexGrow: 1,
             height: `${(bucket.count / max) * 100}%`,

@@ -247,7 +247,15 @@ function ActiveGame({ initialMode, onExit, onFind }) {
     };
     if (cards[3]) event.c4 = cards[3];
     if (game.mode === "normal" && onFind) {
-      onFind({
+      const nextState = computeState(
+        { deck: game.deck, events: [...game.events, event] },
+        game.mode,
+      );
+      const gameComplete = !findSet(
+        nextState.current.slice(0, nextState.boardSize),
+        game.mode,
+      );
+      const findRecord = {
         sessionId: game.startedAt,
         findIndex: history.length,
         time: event.time,
@@ -256,7 +264,11 @@ function ActiveGame({ initialMode, onExit, onFind }) {
           (history.length ? history[history.length - 1].time : game.startedAt),
         board: current.slice(0, boardSize),
         cards: [cards[0], cards[1], cards[2]],
-      });
+      };
+      if (gameComplete) {
+        findRecord.finishDurationMs = event.time - game.startedAt;
+      }
+      onFind(findRecord);
     }
     setGame((value) => ({ ...value, events: [...value.events, event] }));
     setNumHints(0);

@@ -6,10 +6,12 @@ import {
   computeAttributeEffectBySameCount,
   computeBoardSizeTiers,
   computeDifferenceTiers,
+  computeFinishTimeStats,
   computeHypercubeCellStats,
   differsCount,
   durationHistogram,
   exampleSetForPattern,
+  finishTimeHistogram,
   hasEnoughData,
   hypercubePatterns,
   percentileAtThreshold,
@@ -141,11 +143,12 @@ describe("computeBoardSizeTiers()", () => {
 });
 
 describe("hypercubePatterns()", () => {
-  it("enumerates all 16 same/different combinations as a 4x4 grid", () => {
+  it("enumerates the 15 possible same/different combinations", () => {
     const patterns = hypercubePatterns();
-    expect(patterns).toHaveLength(16);
+    expect(patterns).toHaveLength(15);
     const keys = new Set(patterns.map((p) => p.sameAttrs.join(",")));
-    expect(keys.size).toBe(16);
+    expect(keys.size).toBe(15);
+    expect(keys.has("true,true,true,true")).toBe(false);
     for (const pattern of patterns) {
       expect(pattern.row).toBeGreaterThanOrEqual(0);
       expect(pattern.row).toBeLessThan(4);
@@ -224,6 +227,37 @@ describe("durationHistogram()", () => {
       bucketStartSec: 115,
       bucketEndSec: 120,
       count: 2,
+    });
+  });
+});
+
+describe("finish time stats", () => {
+  it("ignores legacy find records and summarizes completed games", () => {
+    const finds = [
+      makeFind({ finishDurationMs: undefined }),
+      makeFind({ finishDurationMs: 120000 }),
+      makeFind({ finishDurationMs: 240000 }),
+    ];
+    expect(computeFinishTimeStats(finds)).toStrictEqual({
+      count: 2,
+      meanMs: 180000,
+      medianMs: 180000,
+      stdDevMs: 60000,
+      minMs: 120000,
+      maxMs: 240000,
+    });
+  });
+
+  it("builds one-minute completion buckets without requiring old records", () => {
+    const histogram = finishTimeHistogram(
+      [makeFind({}), makeFind({ finishDurationMs: 125000 })],
+      { bucketSeconds: 60 },
+    );
+    expect(histogram).toHaveLength(3);
+    expect(histogram[2]).toStrictEqual({
+      bucketStartSec: 120,
+      bucketEndSec: 180,
+      count: 1,
     });
   });
 });
