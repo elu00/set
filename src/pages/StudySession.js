@@ -30,8 +30,12 @@ function StudySession({ pool, markStudyState, onExit }) {
   const [snack, setSnack] = useState({ open: false });
   const [tally, setTally] = useState({ confident: 0, needsReview: 0 });
   const [studyDurationMs, setStudyDurationMs] = useState(null);
-  const [playSuccess] = useSound(foundSfx);
-  const [playFail] = useSound(failSfx);
+  const soundOptions = {
+    interrupt: true,
+    soundEnabled: volume === "on",
+  };
+  const [playSuccess] = useSound(foundSfx, soundOptions);
+  const [playFail] = useSound(failSfx, soundOptions);
 
   const current = pool[queueIndex];
 
@@ -41,7 +45,11 @@ function StudySession({ pool, markStudyState, onExit }) {
   }, [queueIndex]);
 
   function showResult(success, message) {
-    if (volume === "on") (success ? playSuccess : playFail)();
+    if (success) {
+      playSuccess();
+    } else {
+      playFail();
+    }
     setSnack({ open: true, variant: success ? "success" : "error", message });
   }
 

@@ -183,8 +183,12 @@ function ActiveGame({ initialMode, onExit, onFind }) {
   const [numHints, setNumHints] = useState(0);
   const [snack, setSnack] = useState({ open: false });
   const [now, setNow] = useState(Date.now());
-  const [playSuccess] = useSound(foundSfx);
-  const [playFail] = useSound(failSfx);
+  const soundOptions = {
+    interrupt: true,
+    soundEnabled: volume === "on",
+  };
+  const [playSuccess] = useSound(foundSfx, soundOptions);
+  const [playFail] = useSound(failSfx, soundOptions);
 
   const state = useMemo(
     () => computeState({ deck: game.deck, events: game.events }, game.mode),
@@ -233,7 +237,11 @@ function ActiveGame({ initialMode, onExit, onFind }) {
   });
 
   function showResult(success, message) {
-    if (volume === "on") (success ? playSuccess : playFail)();
+    if (success) {
+      playSuccess();
+    } else {
+      playFail();
+    }
     setSnack({ open: true, variant: success ? "success" : "error", message });
   }
 
