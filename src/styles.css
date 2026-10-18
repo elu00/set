@@ -4,6 +4,12 @@ html {
   font-size: 14px;
 }
 
+/* Prevent a downward overscroll from refreshing an in-progress game. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 @media (min-width: 600px) {
   html {
     font-size: 16px;

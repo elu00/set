@@ -6,6 +6,7 @@ import Navbar from "./components/Navbar";
 import { SettingsContext } from "./context";
 import useStorage from "./hooks/useStorage";
 import OfflineGamePage from "./pages/OfflineGamePage";
+import { preventPullToRefresh } from "./preventPullToRefresh";
 import "./styles.css";
 import { darkTheme, lightTheme } from "./themes";
 
@@ -31,6 +32,8 @@ function withCustomColors(theme, colors) {
 }
 
 function App() {
+  useEffect(() => preventPullToRefresh(), []);
+
   const [themeType, setThemeType] = useStorage("theme", "light");
   const [customColors, setCustomColors] = useStorage("customColors", "{}");
   const [keyboardLayout, setKeyboardLayout] = useStorage(
