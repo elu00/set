@@ -328,6 +328,11 @@ function StatsPage({ stats, onBack, onStartStudy }) {
         </Button>
       </Stack>
 
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Each move counts for at most 120 seconds in these statistics.
+        Paused time is excluded from new games.
+      </Typography>
+
       {loading ? (
         <Typography color="text.secondary">Loading…</Typography>
       ) : !enoughData ? (
@@ -349,7 +354,7 @@ function StatsPage({ stats, onBack, onStartStudy }) {
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               The distribution and summary of how long complete normal-mode
-              games took.
+              games took, with each move capped at 120 seconds.
             </Typography>
             <FinishTimesSection finds={finds} />
           </Box>

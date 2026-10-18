@@ -20,6 +20,7 @@ function Game({
   deck,
   boardSize,
   onClick,
+  onInteract,
   onClear,
   selected,
   gameMode,
@@ -253,6 +254,8 @@ function Game({
             background={cards[card].background}
             active={selected.includes(card)}
             onClick={cards[card].inplay ? () => onClick(card) : null}
+            onPointerEnter={cards[card].inplay ? onInteract : undefined}
+            onFocus={cards[card].inplay ? onInteract : undefined}
           />
         </animated.div>
       ))}

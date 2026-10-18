@@ -1,4 +1,6 @@
 import AlarmIcon from "@mui/icons-material/Alarm";
+import PauseIcon from "@mui/icons-material/Pause";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
 import Dialog from "@mui/material/Dialog";
@@ -15,12 +17,20 @@ import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import makeStyles from "@mui/styles/makeStyles";
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import useSound from "use-sound";
 
 import failSfx from "../assets/failedSetSound.mp3";
 import foundSfx from "../assets/successfulSetSound.mp3";
 import Game from "../components/Game";
+import OfflineStatus from "../components/OfflineStatus";
 import SnackContent from "../components/SnackContent";
 import { SettingsContext } from "../context";
 import { formatTime } from "../formatTime";
@@ -33,6 +43,13 @@ import {
   modes,
   removeCard,
 } from "../gameLogic";
+import {
+  createTimer,
+  elapsedTime,
+  moveTiming,
+  pauseTimer,
+  resumeTimer,
+} from "../gameTiming";
 import useKeydown from "../hooks/useKeydown";
 import useNormalModeStats from "../hooks/useNormalModeStats";
 import StatsPage from "./StatsPage";
@@ -101,7 +118,7 @@ function StartScreen({ initialMode, onStart, onViewStats }) {
         Play Set offline
       </Typography>
       <Typography color="text.secondary" align="center" sx={{ mb: 4 }}>
-        Everything runs in this browser—no account or connection is required.
+        Everything runs in this browser, with no account required.
       </Typography>
       <Button
         variant="contained"
@@ -136,6 +153,7 @@ function StartScreen({ initialMode, onStart, onViewStats }) {
         selection. The board and card orientation keys are determined by your
         keyboard layout.
       </Typography>
+      <OfflineStatus />
       <Dialog open={choosingMode} onClose={() => setChoosingMode(false)}>
         <DialogTitle>Choose game mode</DialogTitle>
         <DialogContent>
@@ -183,6 +201,8 @@ function ActiveGame({ initialMode, onExit, onFind }) {
   const [numHints, setNumHints] = useState(0);
   const [snack, setSnack] = useState({ open: false });
   const [now, setNow] = useState(Date.now());
+  const [paused, setPaused] = useState(false);
+  const timerRef = useRef(createTimer(game.startedAt));
   const soundOptions = {
     interrupt: true,
     soundEnabled: volume === "on",
@@ -202,34 +222,80 @@ function ActiveGame({ initialMode, onExit, onFind }) {
   }, [game.mode, history]);
   const availableSet = findSet(current.slice(0, boardSize), game.mode, lastSet);
   const done = !availableSet;
-  const completedAt =
-    done && history.length ? history[history.length - 1].time : now;
-  const elapsed = completedAt - game.startedAt;
+  const elapsed =
+    done && history.length
+      ? history[history.length - 1].elapsedMs
+      : elapsedTime(timerRef.current, now);
+  const { statsElapsedMs } = moveTiming(history, elapsed);
   const totalCards = game.mode === "setjr" ? 27 : game.deck.length;
   const cardsRemoved = totalCards - current.length;
   const estimatedFinish = cardsRemoved
-    ? (elapsed / cardsRemoved) * totalCards
+    ? (statsElapsedMs / cardsRemoved) * totalCards
     : null;
   const maxHints = game.mode === "ultraset" ? 4 : 3;
   const answer = availableSet ? availableSet.slice(0, numHints) : null;
 
   useEffect(() => {
-    if (done) return undefined;
+    if (done || paused) return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 500);
     return () => window.clearInterval(timer);
+  }, [done, paused]);
+
+  const resumeGame = useCallback(() => {
+    if (done || timerRef.current.pausedAt === null) return;
+    const resumedAt = Date.now();
+    // Update synchronously so a card selection that resumes play also uses
+    // the corrected clock when it completes a set in the same event.
+    timerRef.current = resumeTimer(timerRef.current, resumedAt);
+    setPaused(false);
+    setNow(resumedAt);
   }, [done]);
 
+  function pauseGame() {
+    const pausedAt = Date.now();
+    timerRef.current = pauseTimer(timerRef.current, pausedAt);
+    setPaused(true);
+    setNow(pausedAt);
+  }
+
+  useEffect(() => {
+    if (!paused || done) return;
+    const resumeOnAction = (event) => {
+      if (
+        event.target.closest?.("[data-pause-control]") &&
+        (event.type !== "keydown" ||
+          event.key === "Enter" ||
+          event.key === " ")
+      ) {
+        return;
+      }
+      resumeGame();
+    };
+    const events = ["pointerdown", "click", "keydown", "input", "change"];
+    events.forEach((type) =>
+      window.addEventListener(type, resumeOnAction, true),
+    );
+    return () => {
+      events.forEach((type) =>
+        window.removeEventListener(type, resumeOnAction, true),
+      );
+    };
+  }, [done, paused, resumeGame]);
+
   const startNewGame = useCallback(() => {
+    const startedAt = Date.now();
+    timerRef.current = createTimer(startedAt);
     setGame({
       deck: shuffleDeck(),
       events: [],
       mode: initialMode,
-      startedAt: Date.now(),
+      startedAt,
     });
     setSelected([]);
     setNumHints(0);
     setSnack({ open: false });
-    setNow(Date.now());
+    setNow(startedAt);
+    setPaused(false);
   }, [initialMode]);
 
   useKeydown((event) => {
@@ -246,12 +312,17 @@ function ActiveGame({ initialMode, onExit, onFind }) {
   }
 
   function recordSet(cards) {
+    const time = Date.now();
+    const elapsedMs = elapsedTime(timerRef.current, time);
+    const timing = moveTiming(history, elapsedMs);
     const event = {
       c1: cards[0],
       c2: cards[1],
       c3: cards[2],
       user: PLAYER_ID,
-      time: Date.now(),
+      time,
+      elapsedMs,
+      durationMs: timing.durationMs,
     };
     if (cards[3]) event.c4 = cards[3];
     if (game.mode === "normal" && onFind) {
@@ -267,23 +338,23 @@ function ActiveGame({ initialMode, onExit, onFind }) {
         sessionId: game.startedAt,
         findIndex: history.length,
         time: event.time,
-        durationMs:
-          event.time -
-          (history.length ? history[history.length - 1].time : game.startedAt),
+        durationMs: timing.durationMs,
         board: current.slice(0, boardSize),
         cards: [cards[0], cards[1], cards[2]],
       };
       if (gameComplete) {
-        findRecord.finishDurationMs = event.time - game.startedAt;
+        findRecord.finishDurationMs = timing.statsElapsedMs;
       }
       onFind(findRecord);
     }
     setGame((value) => ({ ...value, events: [...value.events, event] }));
+    setNow(time);
     setNumHints(0);
   }
 
   function handleClick(card) {
     if (done) return;
+    resumeGame();
     if (selected.includes(card)) {
       setSelected(removeCard(selected, card));
       return;
@@ -429,6 +500,7 @@ function ActiveGame({ initialMode, onExit, onFind }) {
             boardSize={boardSize}
             selected={selected}
             onClick={handleClick}
+            onInteract={resumeGame}
             onClear={() => setSelected([])}
             gameMode={game.mode}
             lastSet={lastSet}
@@ -444,6 +516,20 @@ function ActiveGame({ initialMode, onExit, onFind }) {
                 {formatTime(elapsed, !done)}
               </Typography>
             </div>
+            <Button
+              data-pause-control="true"
+              startIcon={paused ? <PlayArrowIcon /> : <PauseIcon />}
+              onClick={paused ? resumeGame : pauseGame}
+              disabled={done}
+              aria-pressed={paused}
+            >
+              {paused ? "Resume" : "Pause"}
+            </Button>
+            {paused && (
+              <Typography variant="caption" align="center" role="status">
+                Paused. Any action or card highlight resumes play.
+              </Typography>
+            )}
             <Divider style={{ margin: "8px 0" }} />
             <Typography variant="subtitle1">
               <strong>Scoreboard</strong>
@@ -466,6 +552,9 @@ function ActiveGame({ initialMode, onExit, onFind }) {
             </Typography>
             <Typography variant="h5">
               {estimatedFinish === null ? "—" : formatTime(estimatedFinish)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Statistics count at most 120 seconds per move.
             </Typography>
           </Paper>
         </Grid>

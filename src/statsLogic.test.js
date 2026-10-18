@@ -35,6 +35,67 @@ function makeFind(overrides) {
   };
 }
 
+describe("120-second move cap", () => {
+  it("caps legacy moves in every grouped mean and standard deviation", () => {
+    const pattern = [true, false, false, false];
+    const finds = [
+      makeFind({ durationMs: 10000, sameAttrs: pattern }),
+      makeFind({ durationMs: 300000, sameAttrs: pattern }),
+    ];
+    const groups = [
+      computeDifferenceTiers(finds)[2],
+      computeBoardSizeTiers(finds)[0],
+      computeAttributeEffectBySameCount(finds, 0)[0].same,
+      computeHypercubeCellStats(finds, pattern),
+    ];
+    for (const group of groups) {
+      expect(group.meanMs).toBe(65000);
+      expect(group.stdDevMs).toBe(55000);
+    }
+    expect(finds[1].durationMs).toBe(300000);
+  });
+
+  it("uses capped durations for histograms, percentiles and study comparisons", () => {
+    const finds = [makeFind({ durationMs: 300000 })];
+    expect(percentileAtThreshold(finds, 120000)).toBe(1);
+    expect(percentileAtThreshold(finds, 120001)).toBe(0);
+    expect(selectStudyPool(finds, 120000)[0].durationMs).toBe(120000);
+    expect(selectStudyPool(finds, 120001)).toHaveLength(0);
+    const histogram = durationHistogram(finds, {
+      maxSeconds: 300,
+      bucketSeconds: 60,
+    });
+    expect(histogram.map((bucket) => bucket.count)).toStrictEqual([
+      0, 0, 1, 0, 0,
+    ]);
+  });
+
+  it("adjusts old completion times per session without capping entire games", () => {
+    const finds = [
+      makeFind({ sessionId: 1, durationMs: 300000 }),
+      makeFind({ sessionId: 1, durationMs: 20000, finishDurationMs: 320000 }),
+      makeFind({ sessionId: 2, durationMs: 120000 }),
+      makeFind({ sessionId: 2, durationMs: 120000, finishDurationMs: 240000 }),
+    ];
+    const stats = computeFinishTimeStats(finds);
+    expect(stats.count).toBe(2);
+    expect(stats.meanMs).toBe(190000);
+    expect(stats.minMs).toBe(140000);
+    expect(stats.maxMs).toBe(240000);
+    expect(
+      finishTimeHistogram(finds).map((bucket) => bucket.count),
+    ).toStrictEqual([0, 0, 1, 1]);
+    expect(finds[1].finishDurationMs).toBe(320000);
+  });
+
+  it("ignores absent or invalid completion times", () => {
+    const finds = [null, undefined, -1, NaN, Infinity].map((finishDurationMs) =>
+      makeFind({ finishDurationMs }),
+    );
+    expect(computeFinishTimeStats(finds).count).toBe(0);
+  });
+});
+
 describe("differsCount()", () => {
   it("counts how many of the 4 attributes are different", () => {
     expect(differsCount([true, true, true, true])).toBe(0);

@@ -1,3 +1,5 @@
+import { capMoveDuration } from "./gameTiming";
+
 export const ATTRIBUTE_NAMES = ["Color", "Shape", "Shade", "Number"];
 export const MIN_SAMPLE_SIZE = 15;
 export const HYPERCUBE_MIN_SAMPLES = 3;
@@ -31,7 +33,7 @@ export function computeDifferenceTiers(finds) {
   return [1, 2, 3, 4].map((tier) => {
     const durations = finds
       .filter((find) => differsCount(find.sameAttrs) === tier)
-      .map((find) => find.durationMs);
+      .map((find) => capMoveDuration(find.durationMs));
     return {
       tier,
       count: durations.length,
@@ -62,8 +64,8 @@ export function computeAttributeEffectBySameCount(finds, attributeIndex) {
     const different = inBin.filter((find) => !find.sameAttrs[attributeIndex]);
     const toStats = (group) => ({
       count: group.length,
-      meanMs: mean(group.map((find) => find.durationMs)),
-      stdDevMs: stdDev(group.map((find) => find.durationMs)),
+      meanMs: mean(group.map((find) => capMoveDuration(find.durationMs))),
+      stdDevMs: stdDev(group.map((find) => capMoveDuration(find.durationMs))),
     });
     return {
       sameCount: bin,
@@ -86,7 +88,7 @@ export function computeBoardSizeTiers(finds) {
   return [12, 15, 18].map((bucket) => {
     const durations = finds
       .filter((find) => boardSizeBucket(find.board.length) === bucket)
-      .map((find) => find.durationMs);
+      .map((find) => capMoveDuration(find.durationMs));
     return {
       tier: bucket,
       count: durations.length,
@@ -124,7 +126,7 @@ export function selectFindsByPattern(finds, sameAttrs) {
 
 export function computeHypercubeCellStats(finds, sameAttrs) {
   const durations = selectFindsByPattern(finds, sameAttrs).map(
-    (find) => find.durationMs,
+    (find) => capMoveDuration(find.durationMs),
   );
   return {
     sameAttrs,
@@ -155,6 +157,13 @@ export function exampleSetForPattern(sameAttrs) {
 }
 
 export function durationHistogram(finds, options = {}) {
+  return histogramForDurations(
+    finds.map((find) => capMoveDuration(find.durationMs)),
+    options,
+  );
+}
+
+function histogramForDurations(durations, options = {}) {
   const { maxSeconds = 120, bucketSeconds = 5 } = options;
   const bucketCount = Math.ceil(maxSeconds / bucketSeconds);
   const buckets = Array.from({ length: bucketCount }, (_, i) => ({
@@ -163,8 +172,8 @@ export function durationHistogram(finds, options = {}) {
     count: 0,
   }));
 
-  for (const find of finds) {
-    const seconds = find.durationMs / 1000;
+  for (const duration of durations) {
+    const seconds = duration / 1000;
     const index = Math.min(
       Math.floor(seconds / bucketSeconds),
       bucketCount - 1,
@@ -185,9 +194,30 @@ function median(values) {
 }
 
 function finishDurations(finds) {
+  // Older records stored uncapped moves and wall-clock completion times.
+  // Remove each session's excess without rewriting the saved history.
+  const excessBySession = new Map();
+  for (const find of finds) {
+    if (find.sessionId === undefined || !Number.isFinite(find.durationMs)) {
+      continue;
+    }
+    const excess = find.durationMs - capMoveDuration(find.durationMs);
+    excessBySession.set(
+      find.sessionId,
+      (excessBySession.get(find.sessionId) || 0) + Math.max(0, excess),
+    );
+  }
   return finds
-    .map((find) => find.finishDurationMs)
-    .filter((duration) => Number.isFinite(duration) && duration >= 0);
+    .filter(
+      (find) =>
+        Number.isFinite(find.finishDurationMs) && find.finishDurationMs >= 0,
+    )
+    .map((find) =>
+      Math.max(
+        0,
+        find.finishDurationMs - (excessBySession.get(find.sessionId) || 0),
+      ),
+    );
 }
 
 export function computeFinishTimeStats(finds) {
@@ -211,22 +241,20 @@ export function finishTimeHistogram(finds, options = {}) {
     bucketSeconds,
     Math.ceil(maxDurationSeconds / bucketSeconds) * bucketSeconds,
   );
-  return durationHistogram(
-    durations.map((durationMs) => ({ durationMs })),
-    { maxSeconds, bucketSeconds },
-  );
+  return histogramForDurations(durations, { maxSeconds, bucketSeconds });
 }
 
 export function percentileAtThreshold(finds, thresholdMs) {
   if (finds.length === 0) return 0;
   const slowCount = finds.filter(
-    (find) => find.durationMs >= thresholdMs,
+    (find) => capMoveDuration(find.durationMs) >= thresholdMs,
   ).length;
   return slowCount / finds.length;
 }
 
 export function selectStudyPool(finds, thresholdMs) {
   return finds
+    .map((find) => ({ ...find, durationMs: capMoveDuration(find.durationMs) }))
     .filter(
       (find) =>
         find.durationMs >= thresholdMs && find.studyState !== "confident",

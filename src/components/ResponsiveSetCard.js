@@ -103,6 +103,8 @@ function ResponsiveSetCard(props) {
         transition: "width 0.5s, height 0.5s",
       }}
       onClick={onClick}
+      onPointerEnter={props.onPointerEnter}
+      onFocus={props.onFocus}
     >
       {[...Array(number + 1)].map((_, i) => (
         <ResponsiveSymbol

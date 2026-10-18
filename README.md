@@ -31,8 +31,40 @@ npm run build
 npm test
 ```
 
-No package installation or build was performed as part of the offline port on
-the target machine, because npm is intentionally unavailable there.
+## Reopening offline
+
+The production build automatically saves the complete app with a service worker,
+including its HTML, JavaScript, styles, images, and sounds. Serve it over HTTPS
+(GitHub Pages already does), or use a localhost server for testing. Opening
+`index.html` directly as a `file://` URL does not enable offline caching.
+
+1. Open the deployed site while online. Wait for **Available offline** on the
+   start screen before closing the browser or disconnecting.
+2. Optionally select **Keep offline copy** to ask the browser for persistent
+   storage. Some browsers show a permission prompt; others decide automatically.
+   A denial does not prevent offline use, but leaves the copy eligible for
+   automatic removal when the browser needs space.
+3. Bookmark the full address, including its trailing slash (for example,
+   `https://elu00.github.io/set/`). Reopen that address in the same browser profile
+   after restarting the browser, even without a network connection.
+
+Normal browser restarts preserve the offline copy. Private browsing, clearing
+site data, browser settings that delete data on exit, and browser storage
+eviction can remove it. Persistent storage reduces automatic eviction; a website
+cannot force the browser to retain its data forever.
+
+New deployments download a complete, separately versioned copy in the background
+on a later online visit. An update takes over after all existing tabs for this
+app close, so a running game is not interrupted. If a download fails, the previous
+offline version remains available. Caches for other apps on the same origin are
+left alone.
+
+Offline caching is disabled in `npm run dev`. To test it, run `npm run build`
+and `npm run preview`, visit the preview while online, wait for the ready message,
+then fully quit the browser, stop the preview server, and reopen the same URL in
+the same browser profile. Starting a game, changing settings, and playing sounds
+should still work. The build generates `dist/sw.js`; deploy it with the rest of
+`dist/`.
 
 ## Controls
 
@@ -41,6 +73,16 @@ the target machine, because npm is intentionally unavailable there.
 - Use the layout-specific orientation keys shown by the keyboard-layout
   setting, or use the on-screen controls.
 - Press Ctrl+Enter after a completed game to play again.
+- Use **Pause** next to the clock to stop timing. Clicking, using the keyboard,
+  changing a setting, or highlighting a card resumes automatically; **Resume**
+  also resumes directly. Pausing preserves your selected cards, and the action
+  that resumes play still takes effect.
+
+The game clock shows active playing time, excluding pauses. Statistics and pace
+estimates count at most 120 seconds per move, including completed-game totals
+(the sum of capped move times). Existing saved moves are capped when calculating
+statistics, and existing completion times are adjusted for their session's
+recorded excess time, without rewriting history.
 
 ## License
 

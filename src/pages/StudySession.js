@@ -15,6 +15,7 @@ import SnackContent from "../components/SnackContent";
 import { SettingsContext } from "../context";
 import { formatSeconds } from "../formatTime";
 import { checkSet, removeCard } from "../gameLogic";
+import { capMoveDuration } from "../gameTiming";
 
 // phase: "playing" (selecting cards) -> "confidence" (found it, asking how
 // confident) or "result" (gave up, or confidence just recorded) -> "playing"
@@ -65,7 +66,7 @@ function StudySession({ pool, markStudyState, onExit }) {
       return;
     }
     if (checkSet(...cards)) {
-      setStudyDurationMs(Date.now() - roundStartRef.current);
+      setStudyDurationMs(capMoveDuration(Date.now() - roundStartRef.current));
       showResult(true, "Found a set!");
       setPhase("confidence");
     } else {
@@ -75,7 +76,7 @@ function StudySession({ pool, markStudyState, onExit }) {
   }
 
   function giveUp() {
-    setStudyDurationMs(Date.now() - roundStartRef.current);
+    setStudyDurationMs(capMoveDuration(Date.now() - roundStartRef.current));
     setRevealed(true);
     setResultMessage("Marked as needing more practice.");
     setPhase("result");

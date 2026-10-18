@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { attributeSameness } from "../gameLogic";
+import { capMoveDuration } from "../gameTiming";
 import {
   addFind,
   clearFinds,
@@ -36,6 +37,7 @@ function useNormalModeStats() {
   const recordFind = useCallback((payload) => {
     const record = {
       ...payload,
+      durationMs: capMoveDuration(payload.durationMs),
       sameAttrs: attributeSameness(...payload.cards),
       studyState: "unreviewed",
     };

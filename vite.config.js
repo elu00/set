@@ -1,6 +1,8 @@
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig, transformWithEsbuild } from "vite";
 
+import offlinePlugin from "./scripts/offline-plugin.js";
+
 // https://vite.dev/config/
 export default defineConfig({
   // Relative asset URLs make the built `dist` directory portable: it can be
@@ -39,5 +41,7 @@ export default defineConfig({
     react({
       jsxImportSource: "@emotion/react",
     }),
+
+    offlinePlugin(),
   ],
 });
