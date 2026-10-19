@@ -84,6 +84,24 @@ estimates count at most 120 seconds per move, including completed-game totals
 statistics, and existing completion times are adjusted for their session's
 recorded excess time, without rewriting history.
 
+## Lifetime set coverage
+
+The game sidebar and statistics screen show **Unique found** and **Unique
+appeared**, each out of all possible sets (1,080 for a standard deck). These
+totals accumulate across games and browser restarts. A set is identified by its
+cards, regardless of selection order; repeats count once.
+
+Every valid set available on a dealt board counts as appeared, including sets
+you never select and boards from games you later abandon. Successful finds,
+including in study sessions, count as found. Three-card modes share the same
+collection; Junior displays its 117 eligible combinations, and UltraSet tracks
+its separate collection of 63,180 four-card combinations. In Set-Chain, only sets
+playable under the chain rule count as appeared.
+
+Existing saved finds and the boards recorded with them are included automatically.
+Earlier abandoned boards were not stored and cannot be recovered. **Clear stats**
+resets these lifetime totals along with the timing history.
+
 ## License
 
 Built from the original Set with Friends project by Eric Zhang and Cynthia Du.

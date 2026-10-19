@@ -31,6 +31,7 @@ import failSfx from "../assets/failedSetSound.mp3";
 import foundSfx from "../assets/successfulSetSound.mp3";
 import Game from "../components/Game";
 import OfflineStatus from "../components/OfflineStatus";
+import SetCoverageStats from "../components/SetCoverageStats";
 import SnackContent from "../components/SnackContent";
 import { SettingsContext } from "../context";
 import { formatTime } from "../formatTime";
@@ -38,6 +39,7 @@ import {
   checkSet,
   checkSetUltra,
   computeState,
+  findAllSets,
   findSet,
   generateCards,
   modes,
@@ -187,7 +189,7 @@ function StartScreen({ initialMode, onStart, onViewStats }) {
   );
 }
 
-function ActiveGame({ initialMode, onExit, onFind }) {
+function ActiveGame({ initialMode, onExit, onFind, stats }) {
   const classes = useStyles();
   const { volume, toggleCardOrientation, toggleLayoutOrientation } =
     useContext(SettingsContext);
@@ -220,6 +222,14 @@ function ActiveGame({ initialMode, onExit, onFind }) {
     const { c1, c2, c3 } = history[history.length - 1];
     return [c1, c2, c3];
   }, [game.mode, history]);
+  const availableSets = useMemo(
+    () => findAllSets(current.slice(0, boardSize), game.mode, lastSet),
+    [current, boardSize, game.mode, lastSet],
+  );
+  const { recordSets } = stats;
+  useEffect(() => {
+    recordSets(availableSets);
+  }, [availableSets, recordSets]);
   const availableSet = findSet(current.slice(0, boardSize), game.mode, lastSet);
   const done = !availableSet;
   const elapsed =
@@ -325,6 +335,7 @@ function ActiveGame({ initialMode, onExit, onFind }) {
       durationMs: timing.durationMs,
     };
     if (cards[3]) event.c4 = cards[3];
+    recordSets([cards], true);
     if (game.mode === "normal" && onFind) {
       const nextState = computeState(
         { deck: game.deck, events: [...game.events, event] },
@@ -544,6 +555,13 @@ function ActiveGame({ initialMode, onExit, onFind }) {
               {modes[game.mode].name}
             </Typography>
             <Divider style={{ margin: "8px 0" }} />
+            <SetCoverageStats
+              coverage={stats.coverage}
+              gameMode={game.mode}
+              loading={stats.loading}
+              error={stats.error}
+            />
+            <Divider style={{ margin: "8px 0" }} />
             <Typography variant="subtitle1">
               <strong>Pace</strong>
             </Typography>
@@ -593,6 +611,7 @@ function OfflineGamePage() {
       <StudySession
         pool={studyPool}
         markStudyState={stats.markStudyState}
+        recordSets={stats.recordSets}
         onExit={() => setStudyPool(null)}
       />
     );
@@ -603,6 +622,7 @@ function OfflineGamePage() {
       initialMode={mode}
       onExit={() => setPlaying(false)}
       onFind={stats.recordFind}
+      stats={stats}
     />
   ) : (
     <StartScreen

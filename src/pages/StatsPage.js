@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 
 import DurationHistogram from "../components/DurationHistogram";
 import HypercubeGrid from "../components/HypercubeGrid";
+import SetCoverageStats from "../components/SetCoverageStats";
 import { formatSeconds, formatTime } from "../formatTime";
 import {
   ATTRIBUTE_NAMES,
@@ -328,6 +329,13 @@ function StatsPage({ stats, onBack, onStartStudy }) {
         </Button>
       </Stack>
 
+      <SetCoverageStats
+        coverage={stats.coverage}
+        loading={loading}
+        error={stats.error}
+      />
+      <Divider sx={{ my: 2 }} />
+
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Each move counts for at most 120 seconds in these statistics.
         Paused time is excluded from new games.
@@ -468,6 +476,7 @@ function StatsPage({ stats, onBack, onStartStudy }) {
       <Stack direction="row" spacing={2} justifyContent="flex-end">
         <Button
           color={confirmingClear ? "error" : "inherit"}
+          disabled={loading}
           onClick={() => {
             if (confirmingClear) {
               clearAll();

@@ -2,23 +2,30 @@ import { useCallback, useEffect, useState } from "react";
 
 import { attributeSameness } from "../gameLogic";
 import { capMoveDuration } from "../gameTiming";
+import { coverageEntry, mergeCoverage } from "../setCoverage";
 import {
   addFind,
-  clearFinds,
+  clearStats,
   getAllFinds,
+  getSetCoverage,
+  saveSetCoverage,
   updateFindStudyState,
 } from "../statsDb";
 
 function useNormalModeStats() {
   const [finds, setFinds] = useState(null);
+  const [coverage, setCoverage] = useState(() => new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    getAllFinds()
-      .then((loaded) => {
-        if (!cancelled) setFinds(loaded);
+    Promise.all([getAllFinds(), getSetCoverage()])
+      .then(([loaded, savedCoverage]) => {
+        if (!cancelled) {
+          setFinds(loaded);
+          setCoverage((value) => mergeCoverage(value, savedCoverage));
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -32,6 +39,13 @@ function useNormalModeStats() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const recordSets = useCallback((sets, found = false) => {
+    if (sets.length === 0) return;
+    const entries = sets.map((cards) => coverageEntry(cards, found));
+    setCoverage((value) => mergeCoverage(value, entries));
+    saveSetCoverage(entries).catch((err) => setError(err));
   }, []);
 
   const recordFind = useCallback((payload) => {
@@ -68,14 +82,17 @@ function useNormalModeStats() {
 
   const clearAll = useCallback(() => {
     setFinds([]);
-    clearFinds().catch((err) => setError(err));
+    setCoverage(new Map());
+    clearStats().catch((err) => setError(err));
   }, []);
 
   return {
     finds: finds || [],
+    coverage,
     loading,
     error,
     recordFind,
+    recordSets,
     markStudyState,
     clearAll,
   };

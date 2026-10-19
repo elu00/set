@@ -21,7 +21,7 @@ import { capMoveDuration } from "../gameTiming";
 // confident) or "result" (gave up, or confidence just recorded) -> "playing"
 // for the next card in the pool.
 
-function StudySession({ pool, markStudyState, onExit }) {
+function StudySession({ pool, markStudyState, recordSets, onExit }) {
   const { volume } = useContext(SettingsContext);
   const [queueIndex, setQueueIndex] = useState(0);
   const [selected, setSelected] = useState([]);
@@ -67,6 +67,7 @@ function StudySession({ pool, markStudyState, onExit }) {
     }
     if (checkSet(...cards)) {
       setStudyDurationMs(capMoveDuration(Date.now() - roundStartRef.current));
+      recordSets([cards], true);
       showResult(true, "Found a set!");
       setPhase("confidence");
     } else {

@@ -135,6 +135,44 @@ export function findSet(deck, gameMode = "normal", old = []) {
   return null;
 }
 
+export function setKey(cards) {
+  return cards.slice().sort().join(",");
+}
+
+// Enumerate each playable combination once, independently of card order.
+export function findAllSets(deck, gameMode = "normal", old = []) {
+  const oldCards = new Set(old);
+  const chain = gameMode === "setchain" && old.length > 0;
+  const cards = [...new Set(deck)].filter(
+    (card) => !chain || !oldCards.has(card),
+  );
+  const positions = new Map(cards.map((card, index) => [card, index]));
+  const pairsByConjugate = new Map();
+  const sets = [];
+  for (let i = 0; i < cards.length; i += 1) {
+    for (let j = i + 1; j < cards.length; j += 1) {
+      const conjugate = conjugateCard(cards[i], cards[j]);
+      if (gameMode === "ultraset") {
+        const pairs = pairsByConjugate.get(conjugate) || [];
+        for (const pair of pairs) {
+          if (pair.every((card) => card !== cards[i] && card !== cards[j])) {
+            sets.push([...pair, cards[i], cards[j]]);
+          }
+        }
+        pairs.push([cards[i], cards[j]]);
+        pairsByConjugate.set(conjugate, pairs);
+      } else if (chain) {
+        if (oldCards.has(conjugate)) {
+          sets.push([conjugate, cards[i], cards[j]]);
+        }
+      } else if (positions.get(conjugate) > j) {
+        sets.push([cards[i], cards[j], conjugate]);
+      }
+    }
+  }
+  return sets;
+}
+
 function splitDeck(deck, gameMode = "normal", minBoardSize = 12, old = []) {
   let length = Math.min(deck.length, minBoardSize);
   while (
