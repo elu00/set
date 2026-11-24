@@ -15,6 +15,7 @@ import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import makeStyles from "@mui/styles/makeStyles";
 import {
@@ -54,6 +55,7 @@ import {
 } from "../gameTiming";
 import useKeydown from "../hooks/useKeydown";
 import useNormalModeStats from "../hooks/useNormalModeStats";
+import { createSeed, normalizeSeed, seededShuffle } from "../seededShuffle";
 import StatsPage from "./StatsPage";
 import StudySession from "./StudySession";
 
@@ -101,18 +103,34 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function shuffleDeck() {
-  const deck = generateCards();
-  for (let i = deck.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-  return deck;
+function createGame(mode, seed, isReplay) {
+  return {
+    deck: seededShuffle(generateCards(), seed),
+    events: [],
+    mode,
+    seed,
+    isReplay,
+    startedAt: Date.now(),
+  };
 }
 
 function StartScreen({ initialMode, onStart, onViewStats }) {
   const [mode, setMode] = useState(initialMode);
   const [choosingMode, setChoosingMode] = useState(false);
+  const [choosingSeed, setChoosingSeed] = useState(false);
+  const [seedInput, setSeedInput] = useState("");
+  const [seedError, setSeedError] = useState(false);
+
+  function startSeededGame(event) {
+    event.preventDefault();
+    const seed = normalizeSeed(seedInput);
+    if (!seed) {
+      setSeedError(true);
+      return;
+    }
+    setChoosingSeed(false);
+    onStart(mode, seed);
+  }
 
   return (
     <Container maxWidth="sm" sx={{ py: { xs: 3, sm: 7 } }}>
@@ -150,6 +168,14 @@ function StartScreen({ initialMode, onStart, onViewStats }) {
       >
         View stats
       </Button>
+      <Button
+        color="inherit"
+        size="small"
+        fullWidth
+        onClick={() => setChoosingSeed(true)}
+      >
+        Play a seed
+      </Button>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
         Select cards by clicking them or using the keyboard. Escape clears your
         selection. The board and card orientation keys are determined by your
@@ -185,20 +211,46 @@ function StartScreen({ initialMode, onStart, onViewStats }) {
           <Button onClick={() => setChoosingMode(false)}>Done</Button>
         </DialogActions>
       </Dialog>
+      <Dialog open={choosingSeed} onClose={() => setChoosingSeed(false)}>
+        <form onSubmit={startSeededGame}>
+          <DialogTitle>Play a seed</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Seeded games replay the same deck and do not affect statistics.
+            </Typography>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Seed"
+              value={seedInput}
+              error={seedError}
+              helperText={seedError ? "Enter a seed." : "Seeds are not case-sensitive."}
+              inputProps={{ maxLength: 40 }}
+              onChange={(event) => {
+                setSeedInput(event.target.value);
+                setSeedError(false);
+              }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setChoosingSeed(false)}>Cancel</Button>
+            <Button type="submit" variant="contained">
+              Play
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
     </Container>
   );
 }
 
-function ActiveGame({ initialMode, onExit, onFind, stats }) {
+function ActiveGame({ initialMode, initialSeed, initialIsReplay, onExit, onFind, stats }) {
   const classes = useStyles();
   const { volume, toggleCardOrientation, toggleLayoutOrientation } =
     useContext(SettingsContext);
-  const [game, setGame] = useState(() => ({
-    deck: shuffleDeck(),
-    events: [],
-    mode: initialMode,
-    startedAt: Date.now(),
-  }));
+  const [game, setGame] = useState(() =>
+    createGame(initialMode, initialSeed, initialIsReplay),
+  );
   const [selected, setSelected] = useState([]);
   const [numHints, setNumHints] = useState(0);
   const [snack, setSnack] = useState({ open: false });
@@ -228,8 +280,8 @@ function ActiveGame({ initialMode, onExit, onFind, stats }) {
   );
   const { recordSets } = stats;
   useEffect(() => {
-    recordSets(availableSets);
-  }, [availableSets, recordSets]);
+    if (!game.isReplay) recordSets(availableSets);
+  }, [availableSets, game.isReplay, recordSets]);
   const availableSet = findSet(current.slice(0, boardSize), game.mode, lastSet);
   const done = !availableSet;
   const elapsed =
@@ -292,21 +344,25 @@ function ActiveGame({ initialMode, onExit, onFind, stats }) {
     };
   }, [done, paused, resumeGame]);
 
-  const startNewGame = useCallback(() => {
-    const startedAt = Date.now();
+  const resetGame = useCallback((seed, isReplay) => {
+    const nextGame = createGame(initialMode, seed, isReplay);
+    const { startedAt } = nextGame;
     timerRef.current = createTimer(startedAt);
-    setGame({
-      deck: shuffleDeck(),
-      events: [],
-      mode: initialMode,
-      startedAt,
-    });
+    setGame(nextGame);
     setSelected([]);
     setNumHints(0);
     setSnack({ open: false });
     setNow(startedAt);
     setPaused(false);
   }, [initialMode]);
+
+  const startNewGame = useCallback(() => {
+    resetGame(createSeed(), false);
+  }, [resetGame]);
+
+  const replaySeed = useCallback(() => {
+    resetGame(game.seed, true);
+  }, [game.seed, resetGame]);
 
   useKeydown((event) => {
     if (event.ctrlKey && event.key === "Enter" && done) startNewGame();
@@ -335,8 +391,8 @@ function ActiveGame({ initialMode, onExit, onFind, stats }) {
       durationMs: timing.durationMs,
     };
     if (cards[3]) event.c4 = cards[3];
-    recordSets([cards], true);
-    if (game.mode === "normal" && onFind) {
+    if (!game.isReplay) recordSets([cards], true);
+    if (game.mode === "normal" && !game.isReplay && onFind) {
       const nextState = computeState(
         { deck: game.deck, events: [...game.events, event] },
         game.mode,
@@ -574,6 +630,32 @@ function ActiveGame({ initialMode, onExit, onFind, stats }) {
             <Typography variant="caption" color="text.secondary">
               Statistics count at most 120 seconds per move.
             </Typography>
+            <Divider style={{ margin: "8px 0" }} />
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                title={game.seed}
+                sx={{
+                  flexGrow: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontFamily: "monospace",
+                }}
+              >
+                Seed {game.seed}
+              </Typography>
+              <Button size="small" color="inherit" onClick={replaySeed}>
+                Replay
+              </Button>
+            </Stack>
+            {game.isReplay && (
+              <Typography variant="caption" color="text.secondary">
+                Seeded replay · stats off
+              </Typography>
+            )}
           </Paper>
         </Grid>
       </Grid>
@@ -584,12 +666,18 @@ function ActiveGame({ initialMode, onExit, onFind, stats }) {
 function OfflineGamePage() {
   const [playing, setPlaying] = useState(false);
   const [mode, setMode] = useState("normal");
+  const [gameSetup, setGameSetup] = useState(null);
   const [studyPool, setStudyPool] = useState(null);
   const [viewingStats, setViewingStats] = useState(false);
   const stats = useNormalModeStats();
 
-  function startGame(selectedMode) {
+  function startGame(selectedMode, requestedSeed = "") {
+    const seed = normalizeSeed(requestedSeed);
     setMode(selectedMode);
+    setGameSetup({
+      seed: seed || createSeed(),
+      isReplay: Boolean(seed),
+    });
     setPlaying(true);
   }
 
@@ -620,6 +708,8 @@ function OfflineGamePage() {
   return playing ? (
     <ActiveGame
       initialMode={mode}
+      initialSeed={gameSetup.seed}
+      initialIsReplay={gameSetup.isReplay}
       onExit={() => setPlaying(false)}
       onFind={stats.recordFind}
       stats={stats}
